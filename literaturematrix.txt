@@ -1,0 +1,78 @@
+# Literature Matrix
+
+---
+
+## 1. Core paper (the direct source)
+
+| Citation | Task | Dataset | Method | Key Result | Relevance |
+|---|---|---|---|---|---|
+| Tahmasbi, N. & Rastegari, E. (2018). *A Socio-contextual Approach in Automated Detection of Cyberbullying*. HICSS-51, pp. 1–10. [citation:25] | Binary cyberbullying detection on Twitter | 12,837 English tweets from one celebrity-related incident (607 cyberbullying, 4.7%) | Random forest + four feature groups: textual (LIWC), network centrality, tweet metadata, user metadata. SMOTE for imbalance. 10-fold CV. | User metadata ranked highest by information gain; textual features lowest. All four groups together: cyberbullying recall 62% vs. 32.5% for text alone. Cyberbullying tweets do **not** necessarily contain negative words. | This is the report's source paper. The project adapts its socio-contextual argument to CB2's conversation-level data and adds a paired McNemar test and bootstrap interval for the gain from context. |
+
+**Key claims from the source paper reproduced in this project:**
+- Cyberbullying text does not necessarily contain profane language [citation:7][citation:33]
+- Non-textual features (user metadata, context) carry more signal than text alone [citation:25][citation:37]
+- Combining feature groups outperforms any single group [citation:25]
+
+---
+
+## 2. Dataset papers (CB2 and its construction)
+
+| Citation | Contribution | Relevance |
+|---|---|---|
+| Ejaz, N., Choudhury, S. & Razi, F. (2023). *Towards comprehensive cyberbullying detection: A dataset incorporating aggressive texts, repetition, peerness, and intent to harm*. Computers in Human Behavior, 108123. Mendeley Data DOI 10.17632/wmx9jj2htd.1 [citation:35][citation:36] | Introduces CB2: 9,512 unique user pairs, 90,356 communication messages, 1,021 cyberbullying conversations. Four aspects: aggression, repetition, peerness, intent to harm. Messages from Elsafoury (2020); user data synthetic. | This is the dataset used in the project. Documents the label construction from peerness/intent-to-harm thresholds. |
+| Ejaz, N., Choudhury, S. & Razi, F. (2024). *A multi-faceted semi-synthetic dataset for automated cyberbullying detection*. arXiv:2402.10231. [citation:29] | Describes the data generation process: 100 synthetic users, timestamps, repetition, intent-to-harm calculation. Label = thresholds on peerness (0.4), intent to harm (0.4), and ≥5 repeated messages. | Explains why context features (peerness, message count) overlap with the label rules — a central limitation discussed in the report. |
+| Elsafoury (2020). *Cyberbullying datasets*. Mendeley Data. [citation:24] | Source of the real message text used in CB2. | The text is real; the user attributes are synthetic. This is why CB2 is described as "semi-synthetic." |
+
+---
+
+## 3. Related work on context and conversation-level detection
+
+| Citation | Approach | Finding | Relation to this project |
+|---|---|---|---|
+| Kazemi, A., Qadeer, H., Wagner, J., Hosseini, H., Kalaivendan, S. B. N. & Davis, B. (2026). *SynBullying: A Multi-LLM Synthetic Conversational Dataset for Cyberbullying Detection*. LREC 2026. [citation:10] | LLM-generated multi-turn conversational dataset with context-aware annotations | Provides conversational structure and fine-grained labels; evaluates as training data and augmentation source | Parallels the project's conversation-level framing. Shows the field is moving toward conversational context, as CB2 does. |
+| Agrahari, S. & Tiwari, A. K. (2025). *Enhancing cyberbullying identification with ELECTRA-BiLSTM*. Entertainment Computing, 55, 101056. [citation:9] | ELECTRA + BiLSTM hybrid | 88.38% accuracy on ~48,000 tweets; context and sequential patterns improve detection | Represents the deep-learning ceiling. This project deliberately stays with interpretable ML for a controlled feature comparison. |
+| Verma, K., Davis, B., Milosevic, T. & Umbach, R. (2025). *BullyBench: Youth & Experts-in-the-loop Framework for Intrinsic and Extrinsic Cyberbullying NLP Benchmarking*. EMNLP 2025 Industry Track. [citation:21] | Youth-developed benchmark with expert quality evaluation | Grounded in minors' lived experiences; benchmarks encoder and decoder models for multi-class role classification | Addresses the ethical tension in youth-focused CB data that CB2's synthetic construction is meant to avoid. |
+| Bozyigit, A., Utku, S. & Nasibov, E. (2021). *Cyberbullying detection: Utilizing social media features*. [citation:17] | Machine learning with social media features | "Each experimented machine learning algorithm give more successful prediction performance on the variant containing social media features" | Directly supports the project's H2 (context-only > text-only). |
+
+---
+
+## 4. Methodological references
+
+| Citation | Contribution | Use in this project |
+|---|---|---|
+| Dietterich, T. G. (1998). *Approximate statistical tests for comparing supervised classification learning algorithms*. Neural Computation, 10(7). | McNemar's test for paired classifier comparison | Used for H1: exact McNemar on SVM text-only vs. SVM combined (p ≈ 2.99 × 10⁻¹¹). |
+| Efron, B. & Tibshirani, R. J. (1993). *An Introduction to the Bootstrap*. Chapman & Hall. | Bootstrap confidence intervals | Used for the 5,000-resample percentile CI on the F1 difference [0.153, 0.284]. |
+| Pedregosa et al. (2011). *Scikit-learn: Machine Learning in Python*. JMLR, 12, 2825–2830. | The ML library used throughout | All classifiers, TF-IDF, ColumnTransformer, pipelines. |
+
+---
+
+## 5. Comparative ML studies on cyberbullying
+
+| Citation | Models compared | Key result | Relevance |
+|---|---|---|---|
+| Sen, A. & Das, R. (2025). *Improving Cyberbullying Detection: A Comparative Analysis of Feature Extraction Techniques and Classification Models*. IEEE INSPECT. [citation:5] | LR, SVM, RF, KNN, LGBM, XGBoost with TF-IDF and word embeddings | 91% accuracy, 90.14% F1 | Confirms LR/SVM/RF as standard baselines with TF-IDF. |
+| *A Comparative Study of Classification Models for Cyberbullying Detection*. IEEE, 2024. [citation:11] | Linear SVC, RF, Decision Tree, LR, SGD | SGD classifier F1 94.39% | Shows that linear models remain competitive. |
+| *Cyberbullying Detection using Machine Learning Models* (2025). Journal of IT and Digital World. [citation:20] | LR, Naive Bayes, XGBoost, Decision Tree, RF | Comparative evaluation with accuracy, precision, recall, F1 | Reinforces the standard metric set used here. |
+
+---
+
+## 6. Datasets landscape
+
+| Dataset | Language | Size | Focus | Citation |
+|---|---|---|---|---|
+| CB2 | English | 9,512 pairs | Conversation-level, four CB aspects | Ejaz et al. (2023, 2024) [citation:35][citation:29] |
+| OLID | English | 14,200 tweets | Offensive language, 3-level | Zampieri et al. (2019). SemEval-2019 Task 6. |
+| SynBullying | English | Multi-turn | LLM-generated conversations | Kazemi et al. (2026) [citation:10] |
+| BullyBench | English | Youth-developed | Expert-evaluated benchmark | Verma et al. (2025) [citation:21] |
+
+---
+
+## 7. Summary: how this project relates to the literature
+
+**Strand 1: Socio-contextual detection.** Tahmasbi & Rastegari (2018) showed on one Twitter incident that user metadata and network position matter more than text. This project tests the same argument on CB2, a conversation-level dataset with different construction.
+
+**Strand 2: Classical ML for cyberbullying.** LR, SVM, and RF with TF-IDF remain standard baselines [citation:5][citation:11]. This project uses all three across three feature sets for a controlled comparison.
+
+**Strand 3: Conversational and contextual datasets.** CB2, SynBullying, and BullyBench all move toward multi-turn, context-aware detection [citation:10][citation:21]. This project uses CB2's conversation structure and tests whether tabular context (peerness, message count, demographics) adds value.
+
+**Gap addressed.** Most comparative studies report a single best model. This project runs a 3×3 grid, reports the full matrix, and adds a paired significance test and bootstrap interval for the one comparison the source paper could not make statistically.
