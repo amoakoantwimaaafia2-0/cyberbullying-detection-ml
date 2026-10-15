@@ -149,7 +149,3 @@ time, and all 100 users appear in every split.
 Full list in [`docs/literature_matrix.md`](docs/literature_matrix.md).
 
 ---
-
-## Contact
-
-Maa Afia Amoako-Antwi — Student ID 22049822
