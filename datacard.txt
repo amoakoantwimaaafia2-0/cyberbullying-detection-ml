@@ -1,0 +1,179 @@
+# Data Card: Cyberbullying Conversation Dataset
+
+
+## 1. Summary
+
+This project uses a pre-split, conversation-level dataset of online discussions
+labelled for cyberbullying. Each row represents a conversation between two
+pseudonymised users and is labelled `0` (not cyberbullying) or `1` (cyberbullying).
+The data is supplied as three Parquet files (train, validation, test) and is
+distributed in the Hugging Face `datasets` Parquet format.
+
+---
+
+## 2. Provenance
+
+- **Source:** Conversation-level cyberbullying dataset distributed via the
+  Hugging Face `datasets` library and retrieved as Parquet files.
+- **File naming convention:** `train-00000-of-00001.parquet`,
+  `validation-00000-of-00001.parquet`, `test-00000-of-00001.parquet` — this is
+  the standard Hugging Face `datasets` shard naming scheme.
+- **Licence:** Not explicitly stated with the files provided. Treated as
+  research-only. The dataset is **not redistributed** in this repository.
+- **Access method:** Pre-split Parquet files loaded directly with
+  `pandas.read_parquet()` in `cyberbullyingmodel.ipynb`.
+- **Participant identifiers:** Already pseudonymised by the dataset authors as
+  integers 1–100. No names, emails, handles, or other direct identifiers are
+  present.
+
+---
+
+## 3. Composition
+
+### 3.1 Splits
+
+| Split | Rows | Columns |
+|---|---|---|
+| Train | 7133 | 14 |
+| Validation | 1189 | 14 |
+| Test | 1189 | 14 |
+
+The `text` column is derived at runtime from `conversation` and is not part of
+the original 14.
+
+### 3.2 Columns
+
+| Column | Type | Description | Range / values |
+|---|---|---|---|
+| `user1_id` | int | Pseudonymised ID of first participant | 1–100 |
+| `user2_id` | int | Pseudonymised ID of second participant | 1–100 |
+| `total_messages` | int | Messages in the conversation | 1–40 |
+| `aggressive_count` | int | Messages flagged aggressive | 0–23 |
+| `intent_to_harm` | float | Ratio feature | ~0.01–0.77 |
+| `peerness` | float | Peer-similarity feature | 0.10–0.997 (missing values) |
+| `label` | int | Target | 0 = not cyberbullying, 1 = cyberbullying |
+| `user1_age` | int | Age of user 1 | 8–18 |
+| `user1_gender` | category | Gender of user 1 | Female / Male / Others |
+| `user1_grade` | int | Grade of user 1 | 2–12 |
+| `user2_age` | int | Age of user 2 | 8–18 |
+| `user2_gender` | category | Gender of user 2 | Female / Male / Others |
+| `user2_grade` | int | Grade of user 2 | 2–12 |
+| `conversation` | string (JSON) | JSON array of `{message, label}` objects | — |
+
+### 3.3 Label distribution (training split)
+
+| Label | Count | Percentage |
+|---|---|---|
+| 0 (not cyberbullying) | 6389 | 89.57% |
+| 1 (cyberbullying) | 744 | 10.43% |
+
+The dataset is **heavily imbalanced** (about 8.6:1). This motivates
+`class_weight="balanced"` for all three classifiers and makes macro-averaged F1
+and minority-class F1 the primary metrics, not accuracy.
+
+### 3.4 Missing values (training split)
+
+| Column | Missing | Handling |
+|---|---|---|
+| `peerness` | 3495 (≈49%) | Median imputation fitted on train only |
+| All others | 0 | — |
+
+The high missingness in `peerness` is significant: any model relying on it
+(as the context-only and combined models do) is effectively learning partly
+from an imputed feature. This is discussed in the manuscript's error analysis
+and limitations.
+
+---
+
+## 4. Split Design and Leakage Analysis
+
+The supplied splits were audited in the notebook:
+
+- **Conversation-pair overlap `(user1_id, user2_id)`:** 0 pairs shared across
+  train, validation, and test.
+- **User-level overlap:** All 100 user IDs appear in **all three splits**.
+
+**Interpretation.** Pair-level leakage is prevented — no conversation between
+the same two people appears in more than one split. However, user-level leakage
+is *not* prevented: the same individual can appear in a training conversation
+and a test conversation (paired with a different partner). This is a
+characteristic of the benchmark as distributed, not something introduced in
+this project. It is a limitation documented in the manuscript and model card,
+and it likely inflates test performance relative to a strict user-disjoint
+evaluation.
+
+---
+
+## 5. Preprocessing Applied
+
+1. **Text extraction.** `conversation` (a JSON string) is parsed with
+   `json.loads`, and the `message` fields of all turns are concatenated with
+   spaces into a new `text` column.
+2. **Target.** Only the conversation-level `label` column is used as the
+   target. Per-message labels inside the JSON are *not* used as input.
+3. **Fit isolation.** All vectorisers, imputers, and scalers are fitted on the
+   training split only and applied to validation and test.
+4. **TF-IDF settings.** `max_features=10000`, `ngram_range=(1, 2)`,
+   `lowercase=True`. No stop-word removal, stemming, or lemmatisation.
+5. **Context features.** Numeric features (`total_messages`, `peerness`,
+   `user1_age`, `user1_grade`, `user2_age`, `user2_grade`) are median-imputed
+   and standardised; categorical features (`user1_gender`, `user2_gender`) are
+   most-frequent-imputed and one-hot encoded with `handle_unknown="ignore"`.
+
+---
+
+## 6. Sensitive Content and Privacy
+
+The raw conversation texts contain **slurs, profanity, threats, and personal
+attacks**. Mitigations applied in this repository:
+
+- **Dataset not redistributed.** The `.parquet` files are not committed. Only
+  the code that reads them is published.
+- **Identifiers already pseudonymised** by the dataset authors.
+- **Notebook outputs.** Any notebook cell output that would otherwise echo raw
+  conversation text was cleared before the final commit. Illustrative examples
+  in the manuscript are masked or paraphrased.
+- **No credentials, API keys, or personal data** are stored in the repository.
+
+See `docs/ethics_statement.md` for the full statement.
+
+---
+
+## 7. Intended Use
+
+- **Intended:** coursework and research on conversation-level cyberbullying
+  classification; benchmarking small, interpretable models (Logistic
+  Regression, Linear SVM, Random Forest) on TF-IDF and tabular features.
+- **Not intended:** production content moderation, automated accusations about
+  individuals, or any decision affecting real people. The dataset is small,
+  demographically bounded (ages 8–18), and not temporally current.
+
+---
+
+## 8. Known Limitations and Biases
+
+- **Class imbalance** dominates the precision/recall trade-off; minority-class
+  F1 is the honest headline metric.
+- **User-level leakage** across splits (see §4).
+- **Age range restricted to 8–18**; no evidence results transfer to adults.
+- **Gender coding** collapses non-binary identities into "Others", which may
+  hide subgroup performance differences.
+- **`peerness` missing ~49%** of the time in training; any model using it is
+  partly relying on an imputed signal.
+- **Language and platform** are fixed by the dataset; performance may not
+  transfer to other platforms, languages, or time periods.
+- **Slang and platform norms drift**, so a model trained on this data has a
+  short shelf life.
+
+---
+
+## 9. Reproducibility
+
+To reproduce the results:
+
+1. Obtain the three Parquet files from the original source
+   (`train-00000-of-00001.parquet`, `validation-00000-of-00001.parquet`,
+   `test-00000-of-00001.parquet`).
+2. Place them in the same directory as `cyberbullyingmodel.ipynb`.
+3. Install dependencies: `pip install -r requirements.txt`.
+4. Run the notebook top to bottom.
