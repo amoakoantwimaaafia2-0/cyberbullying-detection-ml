@@ -1,0 +1,186 @@
+# Model Card: Cyberbullying Detection Classifiers
+This card covers the three classifiers evaluated in `cyberbullyingmodel.ipynb`.
+Each is trained under three feature configurations (Text-only, Context-only,
+Combined), giving nine trained models in total.
+
+---
+
+## 1. Overview
+
+| Item | Value |
+|---|---|
+| Task | Binary conversation-level classification |
+| Labels | `0` = not cyberbullying, `1` = cyberbullying |
+| Input unit | One full conversation between two pseudonymised users |
+| Data | Conversation texts (JSON, flattened) + tabular context features |
+| Train / Val / Test rows | 7133 / 1189 / 1189 |
+| Positive class prevalence (train) | 10.43% |
+| Primary metric | F1 on the cyberbullying class (label = 1) |
+| Secondary metrics | Precision, recall on class 1; accuracy |
+
+---
+
+## 2. Models
+
+### 2.1 Logistic Regression (`LogisticRegression`)
+
+- `max_iter=1000`
+- `class_weight="balanced"`
+- `random_state=42`
+- Features: TF-IDF text, tabular context, or both via `ColumnTransformer`
+
+### 2.2 Linear Support Vector Classifier (`LinearSVC`)
+
+- `class_weight="balanced"`
+- `random_state=42`
+- Uses default hinge-loss decision function; no probability calibration applied
+- Same three feature configurations as above
+
+### 2.3 Random Forest (`RandomForestClassifier`)
+
+- `n_estimators=300`
+- `class_weight="balanced"`
+- `random_state=42`
+- `n_jobs=-1`
+- Same three feature configurations as above
+
+---
+
+## 3. Feature Pipelines
+
+Three feature configurations were evaluated, and every model was paired with
+each:
+
+**Text-only**
+- `TfidfVectorizer(max_features=10000, ngram_range=(1, 2), lowercase=True)`
+- Fit on training split only.
+
+**Context-only** (via `ColumnTransformer`)
+- Numeric: `total_messages`, `peerness`, `user1_age`, `user1_grade`,
+  `user2_age`, `user2_grade`
+  → median imputation → `StandardScaler`
+- Categorical: `user1_gender`, `user2_gender`
+  → most-frequent imputation → `OneHotEncoder(handle_unknown="ignore")`
+
+**Combined**
+- The `ColumnTransformer` above plus a TF-IDF branch on the `text` column.
+
+All imputers, scalers, encoders, and vectorisers are fitted **inside** the
+training pipeline and applied to validation/test, so no leakage occurs at the
+preprocessing stage.
+
+---
+
+## 4. Performance
+
+### 4.1 Test-set results (label = 1)
+
+| Classifier | Features | Accuracy | Precision | Recall | **F1** |
+|---|---|---|---|---|---|
+| Logistic Regression | Text | 0.826 | 0.342 | 0.769 | 0.473 |
+| Logistic Regression | Context | 0.854 | 0.403 | 0.909 | 0.558 |
+| Logistic Regression | Combined | 0.881 | 0.453 | 0.843 | 0.590 |
+| Linear SVM | Text | 0.857 | 0.368 | 0.562 | 0.444 |
+| Linear SVM | Context | 0.854 | 0.404 | 0.901 | 0.558 |
+| **Linear SVM** | **Combined** | **0.919** | **0.577** | **0.777** | **0.662** |
+| Random Forest | Text | 0.897 | 0.417 | 0.041 | 0.075 |
+| **Random Forest** | **Context** | **0.943** | **0.757** | **0.645** | **0.696** |
+| Random Forest | Combined | 0.899 | 0.545 | 0.050 | 0.091 |
+
+**Best model by cyberbullying F1: context-only Random Forest (F1 = 0.696).**
+**Best model by combined features: Linear SVM (F1 = 0.662, up from 0.444 text-only).**
+
+### 4.2 Key comparison
+
+The SVM with combined features vs. text-only is the paper's central result:
+
+| Measure | Value |
+|---|---|
+| Text-only F1 | 0.444 |
+| Combined F1 | 0.662 |
+| Absolute improvement | +0.218 |
+| Mean bootstrap F1 difference (5000 resamples, seed 42) | 0.218 |
+| 95% bootstrap CI | [0.153, 0.284] |
+| McNemar exact statistic | 27.0 |
+| McNemar exact p-value | 2.99 × 10⁻¹¹ |
+| Text wrong → combined correct | 101 cases |
+| Text correct → combined wrong | 27 cases |
+
+The bootstrap CI excludes zero and the McNemar test is significant at any
+conventional level, so the improvement is not attributable to chance.
+
+---
+
+## 5. Intended Use
+
+- **Intended:** offline research and coursework on conversation-level
+  cyberbullying classification; comparing feature representations (text vs.
+  context vs. combined) under a fixed, simple modelling setup.
+- **Not intended:**
+  - Production content moderation or automated flagging of real users.
+  - Individual-level accusations. Outputs are probabilistic and the model
+    makes both false positives and false negatives.
+  - Any use on users outside the training population (ages 8–18, same language
+    and platform as the source data).
+  - Any decision with legal or disciplinary consequences.
+
+---
+
+## 6. Limitations
+
+- **Class imbalance.** The positive class is ~10% of training. All models use
+  `class_weight="balanced"`, but minority-class precision remains low
+  (best: 0.757 for RF-context; most others are 0.34–0.58).
+- **User-level leakage.** All 100 users appear in train, validation, and test.
+  Reported test metrics are optimistic relative to a strict user-disjoint
+  evaluation. This is a property of the released splits, not of this
+  implementation.
+- **`peerness` missing ~49%.** Context models depend partly on a median-imputed
+  feature.
+- **Random Forest collapses on text.** RF text and RF combined recall on
+  class 1 are 0.041 and 0.050 respectively — the model predicts the majority
+  class almost always. High accuracy for these two models (0.897, 0.899) is
+  misleading.
+- **Feature ceiling.** TF-IDF with unigrams+bigrams and simple tabular features
+  is a modest representation. Transformer-based or contextual embeddings were
+  not evaluated and would likely raise F1, at the cost of interpretability and
+  compute.
+- **No probability calibration** for Linear SVM.
+- **Single seed (42).** Variance across seeds was not measured. Reported
+  differences smaller than the bootstrap CI width should not be treated as
+  meaningful.
+- **Static.** The data reflects the platform and time of collection. Slang,
+  norms, and target demographics drift.
+
+---
+
+## 7. Ethical Considerations
+
+- The raw conversation texts include slurs, profanity, and threats. The dataset
+  is not redistributed; notebook outputs containing raw text were cleared
+  before publication.
+- Demographic attributes (`user1_age`, `user1_gender`, `user1_grade`, and the
+  same for user 2) are used as features in the context and combined models.
+  This is defensible for research into bias, but should not be used to build
+  systems that make decisions about people based on age, gender, or grade.
+- Predictions are not explanations. A "cyberbullying" prediction from these
+  models should not be treated as evidence that a specific person bullied
+  another.
+
+Full statement in `docs/ethics_statement.md`.
+
+---
+
+## 8. Reproducibility
+
+- Code: `cyberbullyingmodel.ipynb`
+- Environment: `requirements.txt`
+- Fixed random seed: 42 (all classifiers, and the bootstrap)
+- Full procedure: `docs/reproducibility_checklist.md`
+- Reported figures: `figure_1_class_distribution.png` through
+  `figure_5_methodology_pipeline.png`
+- Reported tables: `results_df` in the notebook, and
+  `table_statistical_comparison.csv`
+
+---
+
